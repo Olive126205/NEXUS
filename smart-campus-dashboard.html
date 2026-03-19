@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NEXUS — Smart Campus Monitor</title>
+
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<!-- Chart.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<!-- Leaflet JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<!-- Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet" />
+
+<style>
+  /* ============ VARIABLES ============ */
+  :root {
+    --bg-base: #050a12;
+    --bg-panel: rgba(8, 18, 32, 0.85);
+    --bg-panel-hover: rgba(12, 25, 45, 0.92);
+    --border: rgba(0, 210, 255, 0.18);
+    --border-bright: rgba(0, 210, 255, 0.55);
+    --cyan: #00d2ff;
+    --cyan-dim: rgba(0, 210, 255, 0.6);
+    --green: #00ff9d;
+    --yellow: #ffe566;
+    --orange: #ff8c42;
+    --red: #ff3c5a;
+    --purple: #a259ff;
+    --text-primary: #e8f4ff;
+    --text-secondary: rgba(180, 215, 255, 0.65);
+    --text-mono: #7ecff5;
+    --glow-cyan: 0 0 18px rgba(0, 210, 255, 0.45);
+    --glow-green: 0 0 14px rgba(0, 255, 157, 0.5);
+    --radius: 8px;
+    --font-display: 'Orbitron', monospace;
+    --font-body: 'Rajdhani', sans-serif;
+    --font-mono: 'Share Tech Mono', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: 15px;
+  }
+
+  /* ============ GRID BACKGROUND ============ */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0;
+    background-image:
+      linear-gradient(rgba(0,210,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,210,255,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+  body::after {
+    content: '';
+    position: fixed; inset: 0; z-index: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(0,100,180,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  /* ============ LAYOUT ============ */
+  #app {
+    position: relative; z-index: 1;
+    display: grid;
+    grid-template-rows: 58px 1fr 200px;
+    grid-template-columns: 1fr 340px;
+    grid-template-areas:
+      "header header"
+      "map    sidebar"
+      "bottom bottom";
+    width: 100vw; height: 100vh;
+    gap: 10px;
+    padding: 10px;
+  }
+
+  /* ============ HEADER ============ */
+  header {
+    grid-area: header;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 18px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    backdrop-filter: blur(12px);
+    box-shadow: var(--glow-cyan), inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+
+  .header-left {
+    display: flex; align-items: center; gap: 14px;
+  }
+
+  .logo-mark {
+    width: 32px; height: 32px;
+    border: 2px solid var(--cyan);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: var(--glow-cyan);
+    animation: pulseBorder 3s ease-in-out infinite;
+  }
+  .logo-mark svg { width: 18px; height: 18px; }
+
+  @keyframes pulseBorder {
+    0%, 100% { box-shadow: 0 0 10px rgba(0,210,255,0.4); }
+    50% { box-shadow: 0 0 22px rgba(0,210,255,0.8), 0 0 40px rgba(0,210,255,0.2); }
+  }
+
+  .brand-name {
+    font-family: var(--font-display);
+    font-size: 18px; font-weight: 900;
+    letter-spacing: 4px;
+    color: var(--cyan);
+    text-shadow: var(--glow-cyan);
+  }
+  .brand-sub {
+    font-family: var(--font-mono);
+    font-size: 10px; color: var(--text-secondary);
+    letter-spacing: 2px; margin-top: 2px;
+  }
+
+  .header-center {
+    display: flex; gap: 24px;
+  }
+
+  .stat-pill {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 14px;
+    border: 1px solid var(--border);
+    border-radius: 30px;
+    background: rgba(0,210,255,0.05);
+    font-family: var(--font-mono);
+    font-size: 11px; color: var(--text-secondary);
+  }
+  .stat-pill .val {
+    color: var(--cyan);
+    font-size: 14px; font-weight: bold;
+  }
+
+  .header-right {
+    display: flex; align-items: center; gap: 12px;
+  }
+
+  .live-badge {
+    display: flex; align-items: center; gap: 6px;
+    font-family: var(--font-mono); font-size: 11px;
+    color: var(--green);
+    text-shadow: var(--glow-green);
+    letter-spacing: 1px;
+  }
+  .live-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: var(--glow-green);
+    animation: blink 1.4s ease-in-out infinite;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; } 50% { opacity: 0.25; }
+  }
+
+  .sys-time {
+    font-family: var(--font-mono); font-size: 12px;
+    color: var(--text-mono); letter-spacing: 1px;
+  }
+
+  /* ============ MAP ============ */
+  #map-container {
+    grid-area: map;
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: inset 0 0 40px rgba(0,0,0,0.5);
+  }
+
+  #map { width: 100%; height: 100%; }
+
+  .map-overlay-label {
+    position: absolute; top: 12px; left: 12px; z-index: 1000;
+    font-family: var(--font-mono); font-size: 10px;
+    color: var(--cyan); letter-spacing: 2px;
+    background: rgba(5,10,18,0.7);
+    border: 1px solid var(--border);
+    padding: 4px 10px; border-radius: 4px;
+    pointer-events: none;
+  }
+
+  /* Leaflet dark tile override */
+  .leaflet-tile-pane { filter: brightness(0.35) saturate(0.5) hue-rotate(180deg); }
+  .leaflet-control-attribution { display: none !important; }
+  .leaflet-control-zoom a {
+    background: var(--bg-panel) !important;
+    color: var(--cyan) !important;
+    border-color: var(--border) !important;
+  }
+
+  /* ============ SIDEBAR ============ */
+  #sidebar {
+    grid-area: sidebar;
+    display: flex; flex-direction: column; gap: 10px;
+    overflow-y: auto;
+  }
+  #sidebar::-webkit-scrollbar { width: 4px; }
+  #sidebar::-webkit-scrollbar-track { background: transparent; }
+  #sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ============ PANEL ============ */
+  .panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    backdrop-filter: blur(12px);
+    padding: 14px;
+    transition: border-color 0.3s;
+  }
+  .panel:hover { border-color: var(--border-bright); }
+
+  .panel-title {
+    font-family: var(--font-mono);
+    font-size: 10px; letter-spacing: 3px;
+    color: var(--cyan); text-transform: uppercase;
+    margin-bottom: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .panel-title::before {
+    content: ''; display: block;
+    width: 3px; height: 12px;
+    background: var(--cyan);
+    box-shadow: var(--glow-cyan);
+    border-radius: 2px;
+  }
+
+  /* ============ NODE SELECTOR ============ */
+  .node-list { display: flex; flex-direction: column; gap: 6px; }
+
+  .node-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: rgba(0,210,255,0.02);
+    position: relative; overflow: hidden;
+  }
+  .node-item::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent 60%, rgba(0,210,255,0.05));
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .node-item:hover { border-color: var(--border-bright); background: var(--bg-panel-hover); }
+  .node-item:hover::after { opacity: 1; }
+  .node-item.active {
+    border-color: var(--cyan);
+    background: rgba(0,210,255,0.08);
+    box-shadow: inset 0 0 20px rgba(0,210,255,0.06);
+  }
+
+  .node-dot {
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+    box-shadow: 0 0 8px currentColor;
+  }
+
+  .node-info { flex: 1; min-width: 0; }
+  .node-name {
+    font-family: var(--font-body); font-weight: 600; font-size: 13px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .node-sub {
+    font-family: var(--font-mono); font-size: 10px;
+    color: var(--text-secondary); margin-top: 1px;
+  }
+
+  .node-status {
+    font-family: var(--font-mono); font-size: 10px;
+    padding: 2px 7px; border-radius: 3px; flex-shrink: 0;
+  }
+  .node-status.online {
+    color: var(--green); background: rgba(0,255,157,0.1);
+    border: 1px solid rgba(0,255,157,0.3);
+  }
+  .node-status.offline {
+    color: #888; background: rgba(100,100,100,0.1);
+    border: 1px solid rgba(100,100,100,0.3);
+  }
+
+  /* ============ LIVE DATA PANEL ============ */
+  .metrics-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  }
+
+  .metric-card {
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: rgba(0,0,0,0.3);
+    transition: all 0.3s;
+  }
+  .metric-card:hover { border-color: var(--border-bright); }
+
+  .metric-label {
+    font-family: var(--font-mono); font-size: 9px;
+    letter-spacing: 2px; color: var(--text-secondary);
+    text-transform: uppercase; margin-bottom: 4px;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .metric-icon { font-size: 11px; }
+  .metric-value {
+    font-family: var(--font-display); font-size: 22px;
+    font-weight: 700; line-height: 1;
+    transition: color 0.5s;
+  }
+  .metric-unit {
+    font-family: var(--font-mono); font-size: 11px;
+    color: var(--text-secondary); margin-left: 3px;
+  }
+
+  /* ============ ZONE STATUS ============ */
+  .zone-badge {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px;
+    border-radius: 6px;
+    border: 1px solid currentColor;
+    margin-bottom: 10px;
+    transition: all 0.5s;
+  }
+  .zone-label {
+    font-family: var(--font-display); font-size: 13px;
+    font-weight: 700; letter-spacing: 2px;
+  }
+  .zone-aqi {
+    font-family: var(--font-mono); font-size: 22px; font-weight: bold;
+  }
+
+  /* ============ SIGNAL BARS ============ */
+  .signal-wrap { display: flex; align-items: flex-end; gap: 3px; }
+  .signal-bar {
+    width: 5px; border-radius: 1px;
+    background: var(--border); transition: background 0.4s;
+  }
+  .signal-bar.active { background: var(--cyan); box-shadow: 0 0 5px var(--cyan); }
+
+  /* ============ BOTTOM STRIP ============ */
+  #bottom-bar {
+    grid-area: bottom;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+  }
+
+  /* ============ CHART ============ */
+  .chart-wrap { height: 120px; position: relative; }
+
+  /* ============ NODE STATUS TABLE ============ */
+  .node-table { width: 100%; border-collapse: collapse; }
+  .node-table th {
+    font-family: var(--font-mono); font-size: 9px; letter-spacing: 2px;
+    color: var(--text-secondary); text-transform: uppercase;
+    padding: 4px 8px; text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .node-table td {
+    font-family: var(--font-mono); font-size: 11px;
+    padding: 6px 8px; border-bottom: 1px solid rgba(0,210,255,0.05);
+    color: var(--text-primary);
+  }
+  .node-table tr:last-child td { border-bottom: none; }
+  .node-table tr:hover td { background: rgba(0,210,255,0.04); }
+
+  /* ============ OVERVIEW STATS ============ */
+  .overview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .ov-card {
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: rgba(0,0,0,0.25);
+  }
+  .ov-label {
+    font-family: var(--font-mono); font-size: 9px;
+    letter-spacing: 2px; color: var(--text-secondary);
+    text-transform: uppercase; margin-bottom: 4px;
+  }
+  .ov-value {
+    font-family: var(--font-display); font-size: 20px; font-weight: 700;
+  }
+
+  /* ============ CUSTOM POPUP ============ */
+  .leaflet-popup-content-wrapper {
+    background: rgba(5,12,25,0.95) !important;
+    border: 1px solid var(--border-bright) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 0 30px rgba(0,210,255,0.3) !important;
+    backdrop-filter: blur(12px);
+  }
+  .leaflet-popup-tip { background: rgba(5,12,25,0.95) !important; }
+  .leaflet-popup-content { margin: 0 !important; padding: 0 !important; }
+
+  .popup-inner { padding: 14px 16px; min-width: 200px; }
+  .popup-header {
+    font-family: var(--font-display); font-size: 12px;
+    color: var(--cyan); letter-spacing: 2px;
+    margin-bottom: 10px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .popup-row {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 5px;
+    font-family: var(--font-mono); font-size: 11px;
+  }
+  .popup-key { color: var(--text-secondary); }
+  .popup-val { color: var(--text-primary); font-weight: bold; }
+  .popup-zone {
+    margin-top: 10px; padding: 5px 10px; border-radius: 4px;
+    font-family: var(--font-display); font-size: 10px;
+    letter-spacing: 2px; text-align: center; font-weight: 700;
+  }
+  .popup-time {
+    margin-top: 8px;
+    font-family: var(--font-mono); font-size: 9px;
+    color: var(--text-secondary); text-align: right;
+  }
+
+  /* ============ SCAN LINE ============ */
+  @keyframes scanline {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100vh); }
+  }
+  .scanline {
+    position: fixed; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(transparent, rgba(0,210,255,0.08), transparent);
+    animation: scanline 8s linear infinite;
+    pointer-events: none; z-index: 9999;
+  }
+
+  /* ============ SCROLLBAR ============ */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ============ PULSE RING ============ */
+  @keyframes pulseRing {
+    0% { transform: scale(1); opacity: 0.7; }
+    100% { transform: scale(3.5); opacity: 0; }
+  }
+  .pulse-ring {
+    position: absolute; border-radius: 50%;
+    animation: pulseRing 2s ease-out infinite;
+    pointer-events: none;
+  }
+
+  /* ============ SELECTED NODE INFO ============ */
+  #selected-node-name {
+    font-family: var(--font-display); font-size: 13px;
+    color: var(--cyan); letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+  .timestamp-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 8px;
+    font-family: var(--font-mono); font-size: 10px;
+    color: var(--text-secondary);
+  }
+
+  /* No data state */
+  .no-data {
+    font-family: var(--font-mono); font-size: 11px;
+    color: var(--text-secondary); text-align: center;
+    padding: 20px 0;
+    letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+
+<div class="scanline"></div>
+
+<div id="app">
+  <!-- ====== HEADER ====== -->
+  <header>
+    <div class="header-left">
+      <div class="logo-mark">
+        <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="9" cy="9" r="4" stroke="#00d2ff" stroke-width="1.5"/>
+          <line x1="9" y1="1" x2="9" y2="4" stroke="#00d2ff" stroke-width="1.5"/>
+          <line x1="9" y1="14" x2="9" y2="17" stroke="#00d2ff" stroke-width="1.5"/>
+          <line x1="1" y1="9" x2="4" y2="9" stroke="#00d2ff" stroke-width="1.5"/>
+          <line x1="14" y1="9" x2="17" y2="9" stroke="#00d2ff" stroke-width="1.5"/>
+          <circle cx="9" cy="9" r="2" fill="#00d2ff" opacity="0.6"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-name">NEXUS</div>
+        <div class="brand-sub">SMART CAMPUS MONITOR · v2.4.1</div>
+      </div>
+    </div>
+    <div class="header-center">
+      <div class="stat-pill">NODES <span class="val" id="hdr-online">0</span>/6</div>
+      <div class="stat-pill">AVG AQI <span class="val" id="hdr-aqi">—</span></div>
+      <div class="stat-pill">AVG TEMP <span class="val" id="hdr-temp">—</span></div>
+    </div>
+    <div class="header-right">
+      <div class="live-badge"><div class="live-dot"></div> LIVE</div>
+      <div class="sys-time" id="sys-time">--:--:--</div>
+    </div>
+  </header>
+
+  <!-- ====== MAP ====== -->
+  <div id="map-container">
+    <div id="map"></div>
+    <div class="map-overlay-label">◈ CAMPUS SENSOR GRID</div>
+  </div>
+
+  <!-- ====== SIDEBAR ====== -->
+  <div id="sidebar">
+
+    <!-- Node List -->
+    <div class="panel">
+      <div class="panel-title">Sensor Nodes</div>
+      <div class="node-list" id="node-list"></div>
+    </div>
+
+    <!-- Live Data -->
+    <div class="panel">
+      <div class="panel-title">Live Data</div>
+      <div id="selected-node-name">SELECT A NODE</div>
+      <div id="zone-badge-wrap"></div>
+      <div class="metrics-grid" id="metrics-grid">
+        <div class="no-data" style="grid-column:1/-1">Click a node or marker to view data</div>
+      </div>
+      <div class="timestamp-row" id="ts-row" style="display:none">
+        <span>Last Update</span>
+        <span id="ts-val" style="color:var(--cyan)">—</span>
+      </div>
+    </div>
+
+    <!-- Signal -->
+    <div class="panel" id="signal-panel" style="display:none">
+      <div class="panel-title">Connection</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-secondary)">SIGNAL STRENGTH</span>
+        <div class="signal-wrap" id="signal-bars">
+          <div class="signal-bar" style="height:6px"></div>
+          <div class="signal-bar" style="height:10px"></div>
+          <div class="signal-bar" style="height:14px"></div>
+          <div class="signal-bar" style="height:18px"></div>
+          <div class="signal-bar" style="height:22px"></div>
+        </div>
+      </div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);display:flex;justify-content:space-between;">
+        <span>PROTOCOL</span><span style="color:var(--cyan)">WiFi / ESP32</span>
+      </div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);display:flex;justify-content:space-between;margin-top:4px;">
+        <span>DATABASE</span><span style="color:var(--green)">Firebase RTDB</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ====== BOTTOM BAR ====== -->
+  <div id="bottom-bar">
+
+    <!-- AQI Chart -->
+    <div class="panel">
+      <div class="panel-title">Air Quality Trend</div>
+      <div class="chart-wrap">
+        <canvas id="aqiChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Temp Chart -->
+    <div class="panel">
+      <div class="panel-title">Temperature Trend</div>
+      <div class="chart-wrap">
+        <canvas id="tempChart"></canvas>
+      </div>
+    </div>
+
+    <!-- System Overview -->
+    <div class="panel">
+      <div class="panel-title">System Overview</div>
+      <div class="overview-grid">
+        <div class="ov-card">
+          <div class="ov-label">Online</div>
+          <div class="ov-value" id="ov-online" style="color:var(--green)">—</div>
+        </div>
+        <div class="ov-card">
+          <div class="ov-label">Offline</div>
+          <div class="ov-value" id="ov-offline" style="color:var(--red)">—</div>
+        </div>
+        <div class="ov-card">
+          <div class="ov-label">Safe Zones</div>
+          <div class="ov-value" id="ov-safe" style="color:var(--green)">—</div>
+        </div>
+        <div class="ov-card">
+          <div class="ov-label">Alert Zones</div>
+          <div class="ov-value" id="ov-alert" style="color:var(--orange)">—</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ====================================================
+     JAVASCRIPT
+     ====================================================
+     Firebase Integration Notes:
+     ─────────────────────────────────────────────────────
+     To connect to your Firebase Realtime Database, replace
+     the `MOCK_DATA` section below with a Firebase listener:
+
+     import { initializeApp } from "firebase/app";
+     import { getDatabase, ref, onValue } from "firebase/database";
+
+     const firebaseConfig = {
+       apiKey: "YOUR_API_KEY",
+       authDomain: "YOUR_PROJECT.firebaseapp.com",
+       databaseURL: "https://YOUR_PROJECT.firebaseio.com",
+       projectId: "YOUR_PROJECT_ID",
+     };
+     const app = initializeApp(firebaseConfig);
+     const db = getDatabase(app);
+
+     // Replace updateAllNodes() calls with:
+     const nodesRef = ref(db, "nodes");
+     onValue(nodesRef, (snapshot) => {
+       const data = snapshot.val();
+       // Map Firebase data to nodes array and call renderAll(nodes)
+     });
+
+     Expected Firebase structure:
+     /nodes/{nodeId} : {
+       name, lat, lng, temperature, humidity,
+       pressure, aqi, online, lastUpdate
+     }
+     ──────────────────────────────────────────────────── -->
+<script>
+// ============================================================
+//  DATA LAYER — Replace this section with Firebase listeners
+// ============================================================
+
+const NODES_CONFIG = [
+  { id: "NODE-A1", name: "Prixx Robotics Lab",        lat: 18.4985, lng: 73.7738, zone: "Lab"   },
+  { id: "NODE-B2", name: "Main Gate",    lat: 18.4995, lng: 73.7743, zone: "Gate" },  
+  { id: "NODE-F6", name: "Hostel Block",     lat: 18.4983, lng: 73.7743, zone: "housing" },
+];
+
+// AQI zone classification (based on MQ135 raw values)
+function classifyZone(aqi) {
+  if (aqi <= 100)  return { label: "HEALTHY",   color: "#00ff9d", bg: "rgba(0,255,157,0.12)"  };
+  if (aqi <= 150)  return { label: "GOOD",      color: "#a8ff78", bg: "rgba(168,255,120,0.12)" };
+  if (aqi <= 200)  return { label: "MODERATE",  color: "#ffe566", bg: "rgba(255,229,102,0.12)" };
+  if (aqi <= 300)  return { label: "POOR",      color: "#ff8c42", bg: "rgba(255,140,66,0.12)"  };
+  return            { label: "HAZARDOUS", color: "#ff3c5a", bg: "rgba(255,60,90,0.12)"  };
+}
+
+// ============================================================
+// FIREBASE REALTIME DATA
+// ============================================================
+
+var firebaseConfig = {
+  apiKey: "AIzaSyAf8uh8IjEVdrkekGf5OAJkBzhd0IaRflM",
+  databaseURL: "https://rajsonali-ec4cf-default-rtdb.firebaseio.com"
+};
+
+firebase.initializeApp(firebaseConfig);
+var db = firebase.database();
+
+// listen to all nodes
+var nodesRef = db.ref("nodes");
+
+nodesRef.on("value", function(snapshot){
+
+  const data = snapshot.val();
+  if(!data) return;
+
+  nodes = NODES_CONFIG.map(cfg => {
+
+    const d = data[cfg.id];
+
+    if(!d){
+      return {
+        ...cfg,
+        online:false,
+        temperature:0,
+        humidity:0,
+        pressure:0,
+        aqi:0,
+        signal:0,
+        lastUpdate:"--"
+      };
+    }
+
+    // deep sleep detection
+    const now = Math.floor(Date.now()/1000);
+    const last = d.timestamp || 0;
+
+    const online = (now - last) < 900;
+
+    return {
+      ...cfg,
+      online:online,
+      temperature:d.temperature ?? 0,
+      humidity:d.humidity ?? -1,
+      pressure:d.pressure ?? 0,
+      aqi:d.aqi ?? 0,
+      signal:4,
+      lastUpdate:d.lastUpdate ?? "--"
+    };
+
+  });
+
+  renderAll();
+
+// auto focus first online node
+if(!selectedId){
+  const onlineNode = nodes.find(n => n.online);
+  if(onlineNode){
+    selectNode(onlineNode.id);
+  }
+}
+
+});
+
+
+function renderAll(){
+
+  nodes.forEach(n => addOrUpdateMarker(n));
+
+  renderNodeList();
+
+  updateHeader();
+
+  updateOverview();
+
+  if(selectedId){
+
+    const n = nodes.find(x => x.id === selectedId);
+
+    if(n){
+
+      renderLiveData(n);
+
+      renderSignal(n);
+
+      pushHistory(n);
+
+    }
+
+  }
+
+}
+
+// ============================================================
+//  STATE
+// ============================================================
+let nodes = [];
+let selectedId = null;
+let aqiHistory  = { labels: [], data: [] };
+let tempHistory = { labels: [], data: [] };
+let aqiChart, tempChart;
+let markers = {};
+
+// ============================================================
+//  LEAFLET MAP SETUP
+// ============================================================
+const map = L.map('map', { zoomControl: true, attributionControl: false })
+  .setView([18.6275, 73.8057], 16);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+}).addTo(map);
+
+function makeMarkerIcon(color, online) {
+  const opacity = online ? 1 : 0.4;
+  return L.divIcon({
+    className: '',
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -16],
+    html: `
+      <div style="position:relative;width:28px;height:28px;">
+        <div style="
+          position:absolute;inset:0;border-radius:50%;
+          border:2px solid ${color};
+          background:${color}22;
+          opacity:${opacity};
+          box-shadow:0 0 14px ${color}88;
+        "></div>
+        <div style="
+          position:absolute;top:50%;left:50%;
+          transform:translate(-50%,-50%);
+          width:10px;height:10px;border-radius:50%;
+          background:${color};
+          opacity:${opacity};
+          box-shadow:0 0 8px ${color};
+        "></div>
+        ${online ? `<div style="
+          position:absolute;inset:0;border-radius:50%;
+          border:2px solid ${color};
+          animation:pulseRing 2s ease-out infinite;
+        "></div>` : ''}
+      </div>
+    `,
+  });
+}
+
+function buildPopupHTML(n) {
+  const z = classifyZone(n.aqi);
+  const ts = new Date(n.lastUpdate).toLocaleTimeString();
+  return `
+    <div class="popup-inner">
+      <div class="popup-header">◈ ${n.id} — ${n.name}</div>
+      <div class="popup-row"><span class="popup-key">🌡 TEMP</span><span class="popup-val">${n.temperature} °C</span></div>
+      <div class="popup-row"><span class="popup-key">💧 HUMIDITY</span><span class="popup-val">${n.humidity} %</span></div>
+      <div class="popup-row"><span class="popup-key">🌪 PRESSURE</span><span class="popup-val">${n.pressure} hPa</span></div>
+      <div class="popup-row"><span class="popup-key">🌫 AIR QUALITY</span><span class="popup-val">${n.aqi}</span></div>
+      <div class="popup-zone" style="color:${z.color};background:${z.bg};border:1px solid ${z.color}44;">
+        ${z.label}
+      </div>
+      <div class="popup-time">⏱ ${ts}</div>
+    </div>
+  `;
+}
+
+function addOrUpdateMarker(n) {
+  const z = classifyZone(n.aqi);
+  if (markers[n.id]) {
+    markers[n.id].setIcon(makeMarkerIcon(z.color, n.online));
+    markers[n.id].getPopup().setContent(buildPopupHTML(n));
+  } else {
+    const m = L.marker([n.lat, n.lng], { icon: makeMarkerIcon(z.color, n.online) })
+      .addTo(map)
+      .bindPopup(buildPopupHTML(n), { maxWidth: 240, minWidth: 210 });
+    m.on('click', () => selectNode(n.id));
+    markers[n.id] = m;
+  }
+}
+
+// ============================================================
+//  NODE LIST (sidebar)
+// ============================================================
+function renderNodeList() {
+  const el = document.getElementById('node-list');
+  el.innerHTML = '';
+  nodes.forEach(n => {
+    const z = classifyZone(n.aqi);
+    const div = document.createElement('div');
+    div.className = 'node-item' + (n.id === selectedId ? ' active' : '');
+    div.innerHTML = `
+      <div class="node-dot" style="background:${n.online ? z.color : '#444'};color:${n.online ? z.color : '#444'}"></div>
+      <div class="node-info">
+        <div class="node-name">${n.name}</div>
+        <div class="node-sub">${n.id} · AQI ${n.online ? n.aqi : '—'}</div>
+      </div>
+      <div class="node-status ${n.online ? 'online' : 'offline'}">${n.online ? 'ONLINE' : 'OFFLINE'}</div>
+    `;
+    div.addEventListener('click', () => selectNode(n.id));
+    el.appendChild(div);
+  });
+}
+
+// ============================================================
+//  SELECT NODE
+// ============================================================
+function selectNode(id) {
+  selectedId = id;
+  const n = nodes.find(x => x.id === id);
+  if (!n) return;
+
+  // Pan map
+  map.flyTo([n.lat, n.lng], 17, { duration: 0.8 });
+  markers[n.id]?.openPopup();
+
+  renderNodeList();
+  renderLiveData(n);
+  renderSignal(n);
+
+  // Reset chart history for new node
+  aqiHistory  = { labels: [], data: [] };
+  tempHistory = { labels: [], data: [] };
+  pushHistory(n);
+}
+
+// ============================================================
+//  LIVE DATA PANEL
+// ============================================================
+function renderLiveData(n) {
+  document.getElementById('selected-node-name').textContent = `${n.name} — ${n.id}`;
+
+  const z = classifyZone(n.aqi);
+  document.getElementById('zone-badge-wrap').innerHTML = `
+    <div class="zone-badge" style="color:${z.color};background:${z.bg};border-color:${z.color}55;margin-bottom:10px;">
+      <span class="zone-label">${z.label}</span>
+      <span class="zone-aqi">${n.online ? n.aqi : '—'}</span>
+    </div>
+  `;
+
+  if (!n.online) {
+    document.getElementById('metrics-grid').innerHTML =
+      `<div class="no-data" style="grid-column:1/-1">Node offline — no data</div>`;
+    document.getElementById('ts-row').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('metrics-grid').innerHTML = `
+    <div class="metric-card">
+      <div class="metric-label"><span class="metric-icon">🌡</span> TEMPERATURE</div>
+      <div class="metric-value" style="color:#ff8c42">${n.temperature}<span class="metric-unit">°C</span></div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label"><span class="metric-icon">💧</span> HUMIDITY</div>
+      <div class="metric-value" style="color:#00d2ff">${n.humidity}<span class="metric-unit">%</span></div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label"><span class="metric-icon">🌪</span> PRESSURE</div>
+      <div class="metric-value" style="color:#a259ff">${n.pressure}<span class="metric-unit">hPa</span></div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label"><span class="metric-icon">🌫</span> AIR QUALITY</div>
+      <div class="metric-value" style="color:${z.color}">${n.aqi}<span class="metric-unit">AQI</span></div>
+    </div>
+  `;
+
+  const tsRow = document.getElementById('ts-row');
+  tsRow.style.display = 'flex';
+  document.getElementById('ts-val').textContent =
+    new Date(n.lastUpdate).toLocaleTimeString();
+}
+
+// ============================================================
+//  SIGNAL
+// ============================================================
+function renderSignal(n) {
+  const panel = document.getElementById('signal-panel');
+  if (!n.online) { panel.style.display = 'none'; return; }
+  panel.style.display = '';
+  const bars = document.querySelectorAll('.signal-bar');
+  bars.forEach((b, i) => b.classList.toggle('active', i < n.signal));
+}
+
+// ============================================================
+//  CHARTS
+// ============================================================
+function initCharts() {
+  const opts = {
+    responsive: true, maintainAspectRatio: false,
+    animation: { duration: 400 },
+    plugins: { legend: { display: false } },
+    scales: {
+      x: {
+        grid: { color: 'rgba(0,210,255,0.06)' },
+        ticks: { color: 'rgba(180,215,255,0.45)', font: { family: 'Share Tech Mono', size: 9 } },
+      },
+      y: {
+        grid: { color: 'rgba(0,210,255,0.06)' },
+        ticks: { color: 'rgba(180,215,255,0.45)', font: { family: 'Share Tech Mono', size: 9 } },
+      },
+    },
+  };
+
+  aqiChart = new Chart(document.getElementById('aqiChart'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        data: [], borderColor: '#00d2ff', backgroundColor: 'rgba(0,210,255,0.08)',
+        borderWidth: 2, tension: 0.4, fill: true, pointRadius: 2, pointBackgroundColor: '#00d2ff',
+      }],
+    },
+    options: { ...opts },
+  });
+
+  tempChart = new Chart(document.getElementById('tempChart'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        data: [], borderColor: '#ff8c42', backgroundColor: 'rgba(255,140,66,0.08)',
+        borderWidth: 2, tension: 0.4, fill: true, pointRadius: 2, pointBackgroundColor: '#ff8c42',
+      }],
+    },
+    options: { ...opts },
+  });
+}
+
+function pushHistory(n) {
+  if (!n.online) return;
+  const label = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const MAX = 20;
+  aqiHistory.labels.push(label);   aqiHistory.data.push(n.aqi);
+  tempHistory.labels.push(label);  tempHistory.data.push(n.temperature);
+  if (aqiHistory.labels.length > MAX)  { aqiHistory.labels.shift();  aqiHistory.data.shift(); }
+  if (tempHistory.labels.length > MAX) { tempHistory.labels.shift(); tempHistory.data.shift(); }
+
+  aqiChart.data.labels   = [...aqiHistory.labels];
+  aqiChart.data.datasets[0].data = [...aqiHistory.data];
+  aqiChart.update('none');
+
+  tempChart.data.labels  = [...tempHistory.labels];
+  tempChart.data.datasets[0].data = [...tempHistory.data];
+  tempChart.update('none');
+}
+
+// ============================================================
+//  HEADER STATS
+// ============================================================
+function updateHeader() {
+  const online = nodes.filter(n => n.online);
+  const avgAqi = online.length
+    ? Math.round(online.reduce((s, n) => s + n.aqi, 0) / online.length)
+    : '—';
+  const avgTemp = online.length
+    ? (online.reduce((s, n) => s + n.temperature, 0) / online.length).toFixed(1)
+    : '—';
+
+  document.getElementById('hdr-online').textContent = online.length;
+  document.getElementById('hdr-aqi').textContent    = avgAqi;
+  document.getElementById('hdr-temp').textContent   = avgTemp + (online.length ? '°' : '');
+}
+
+// ============================================================
+//  OVERVIEW PANEL
+// ============================================================
+function updateOverview() {
+  const online   = nodes.filter(n => n.online).length;
+  const offline  = nodes.length - online;
+  const safeZones  = nodes.filter(n => n.online && n.aqi <= 150).length;
+  const alertZones = nodes.filter(n => n.online && n.aqi > 150).length;
+  document.getElementById('ov-online').textContent  = online;
+  document.getElementById('ov-offline').textContent = offline;
+  document.getElementById('ov-safe').textContent    = safeZones;
+  document.getElementById('ov-alert').textContent   = alertZones;
+}
+
+// ============================================================
+//  CLOCK
+// ============================================================
+function updateClock() {
+  document.getElementById('sys-time').textContent =
+    new Date().toLocaleTimeString([], { hour12: false });
+}
+
+// ============================================================
+//  INIT
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  initCharts();
+  
+});
+setInterval(updateClock,1000);
+updateClock();
+</script>
+</body>
+</html>
