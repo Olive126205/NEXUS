@@ -47,8 +47,12 @@
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
-  html, body {
-    width: 100%; height: 100%; overflow: hidden;
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
     background: var(--bg-base);
     color: var(--text-primary);
     font-family: var(--font-body);
@@ -481,7 +485,90 @@
     padding: 20px 0;
     letter-spacing: 1px;
   }
-</style>
+  /* ================= MOBILE RESPONSIVE ================= */
+@media (max-width: 768px) {
+
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    padding: 8px;
+  }
+
+  header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .header-center {
+    flex-wrap: wrap;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .stat-pill {
+    flex: 1;
+    justify-content: space-between;
+  }
+
+  /* Map smaller */
+  #map-container {
+    height: 250px;
+  }
+
+  /* Sidebar full width */
+  #sidebar {
+    width: 100%;
+    max-height: none;
+  }
+
+  /* Panels spacing */
+  .panel {
+    padding: 12px;
+  }
+
+  /* Metrics in single column */
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Charts stacked */
+  #bottom-bar {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .chart-wrap {
+    height: 160px;
+  }
+
+  /* Node items bigger touch */
+  .node-item {
+    padding: 14px;
+  }
+
+  /* Better readability */
+  .metric-value {
+    font-size: 18px;
+  }
+
+  .brand-name {
+    font-size: 16px;
+  }
+
+  /* Hide heavy glow effects for performance */
+  .scanline {
+    display: none;
+  }
+}
+
+/* Sidebar toggle (mobile) */
+#sidebar.hide {
+  display: none;
+}
+</style>  
 </head>
 <body>
 
@@ -512,6 +599,14 @@
       <div class="stat-pill">AVG TEMP <span class="val" id="hdr-temp">—</span></div>
     </div>
     <div class="header-right">
+        <button onclick="toggleSidebar()" style="
+    background:none;
+    border:1px solid var(--border);
+    color:var(--cyan);
+    padding:4px 10px;
+    border-radius:6px;
+    cursor:pointer;
+  ">☰</button>
       <div class="live-badge"><div class="live-dot"></div> LIVE</div>
       <div class="sys-time" id="sys-time">--:--:--</div>
     </div>
@@ -614,39 +709,6 @@
   </div>
 </div>
 
-<!-- ====================================================
-     JAVASCRIPT
-     ====================================================
-     Firebase Integration Notes:
-     ─────────────────────────────────────────────────────
-     To connect to your Firebase Realtime Database, replace
-     the `MOCK_DATA` section below with a Firebase listener:
-
-     import { initializeApp } from "firebase/app";
-     import { getDatabase, ref, onValue } from "firebase/database";
-
-     const firebaseConfig = {
-       apiKey: "YOUR_API_KEY",
-       authDomain: "YOUR_PROJECT.firebaseapp.com",
-       databaseURL: "https://YOUR_PROJECT.firebaseio.com",
-       projectId: "YOUR_PROJECT_ID",
-     };
-     const app = initializeApp(firebaseConfig);
-     const db = getDatabase(app);
-
-     // Replace updateAllNodes() calls with:
-     const nodesRef = ref(db, "nodes");
-     onValue(nodesRef, (snapshot) => {
-       const data = snapshot.val();
-       // Map Firebase data to nodes array and call renderAll(nodes)
-     });
-
-     Expected Firebase structure:
-     /nodes/{nodeId} : {
-       name, lat, lng, temperature, humidity,
-       pressure, aqi, online, lastUpdate
-     }
-     ──────────────────────────────────────────────────── -->
 <script>
 // ============================================================
 //  DATA LAYER — Replace this section with Firebase listeners
@@ -777,7 +839,10 @@ let markers = {};
 // ============================================================
 //  LEAFLET MAP SETUP
 // ============================================================
-const map = L.map('map', { zoomControl: true, attributionControl: false })
+const map = L.map('map', { 
+  zoomControl: window.innerWidth > 768, 
+  attributionControl: false 
+})
   .setView([18.6275, 73.8057], 16);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -881,7 +946,6 @@ function selectNode(id) {
   const n = nodes.find(x => x.id === id);
   if (!n) return;
 
-  // Pan map
   map.flyTo([n.lat, n.lng], 17, { duration: 0.8 });
   markers[n.id]?.openPopup();
 
@@ -889,10 +953,14 @@ function selectNode(id) {
   renderLiveData(n);
   renderSignal(n);
 
-  // Reset chart history for new node
   aqiHistory  = { labels: [], data: [] };
   tempHistory = { labels: [], data: [] };
   pushHistory(n);
+
+  // 🔥 auto close sidebar on mobile
+  if(window.innerWidth < 768){
+    document.getElementById('sidebar').classList.add('hide');
+  }
 }
 
 // ============================================================
@@ -1063,6 +1131,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 setInterval(updateClock,1000);
 updateClock();
+function toggleSidebar(){
+  document.getElementById('sidebar').classList.toggle('hide');
+}
 </script>
 </body>
 </html>
